@@ -2,21 +2,21 @@
 
 /**
  * Magento
- * 
+ *
  * NOTICE OF LICENSE
- * 
- * This source file is subject to the Open Software License (OSL 3.0)  
- * that is bundled with this package in the file LICENSE.txt.  
- * It is also available through the world-wide-web at this URL:  
- * http://opensource.org/licenses/osl-3.0.php  
- * If you did not receive a copy of the license and are unable to  
- * obtain it through the world-wide-web, please send an email  
- * to license@magentocommerce.com so we can send you a copy immediately.  
- * 
- * @category Paymill  
- * @package Paymill_Paymill  
- * @copyright Copyright (c) 2013 PAYMILL GmbH (https://paymill.com/en-gb/)  
- * @license http://opensource.org/licenses/osl-3.0.php Open Software License (OSL 3.0)  
+ *
+ * This source file is subject to the Open Software License (OSL 3.0)
+ * that is bundled with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/osl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to license@magentocommerce.com so we can send you a copy immediately.
+ *
+ * @category Paymill
+ * @package Paymill_Paymill
+ * @copyright Copyright (c) 2013 PAYMILL GmbH (https://paymill.com/en-gb/)
+ * @license http://opensource.org/licenses/osl-3.0.php Open Software License (OSL 3.0)
  */
 abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Payment_Model_Method_Abstract
 {
@@ -47,7 +47,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      * @var boolean
      */
     protected $_canCapture = true;
-    
+
     /**
      * Can use the partial capture method
      *
@@ -68,7 +68,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      * @var boolean
      */
     protected $_canUseForMultishipping = false;
-    
+
 
     /**
      * Payment Title
@@ -83,24 +83,24 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      * @var string
      */
     protected $_code = 'paymill_abstract';
-    
+
     /**
      * Paymill error code
-     * 
+     *
      * @var string
      */
     protected $_errorCode;
-    
+
     /**
      * Is pre-auth
-     * 
+     *
      * @var boolean
      */
     protected $_preauthFlag;
-    
+
     /**
      * Can use for internal payments
-     * 
+     *
      * @var boolean
      */
     protected $_canUseInternal = false;
@@ -173,8 +173,8 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         } else {
             $post = $data->getData();
         }
-        
-        if (array_key_exists('paymill-payment-token-' . $this->_getShortCode(), $post) 
+
+        if (array_key_exists('paymill-payment-token-' . $this->_getShortCode(), $post)
                 && !empty($post['paymill-payment-token-' . $this->_getShortCode()])) {
             //Save Data into session
             Mage::getSingleton('core/session')->setToken($post['paymill-payment-token-' . $this->_getShortCode()]);
@@ -209,9 +209,9 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         } else {
             Mage::helper('paymill/loggingHelper')->log("Starting payment process as debit");
             $this->_preauthFlag = false;
-            
+
         }
-        
+
         $success = $this->payment($payment, $amount);
 
         if (!$success) {
@@ -219,7 +219,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
             Mage::getSingleton('checkout/session')->setGotoSection('payment');
             Mage::throwException(Mage::helper("paymill/paymentHelper")->getErrorMessage($this->_errorCode));
         }
-        
+
         //Finish as usual
         return parent::authorize($payment, $amount);
     }
@@ -236,13 +236,13 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         $paymentHelper = Mage::helper("paymill/paymentHelper");
         $fcHelper = Mage::helper("paymill/fastCheckoutHelper");
         $paymentProcessor = $paymentHelper->createPaymentProcessor($this->getCode(), $token);
-        
+
         //Always load client if email doesn't change
         $clientId = $fcHelper->getClientId();
         if (isset($clientId) && !is_null(Mage::helper("paymill/customerHelper")->getClientData())) {
             $paymentProcessor->setClientId($clientId);
         }
-        
+
         //Loading Fast Checkout Data (if enabled and given)
         if ($fcHelper->hasData($this->_code) && $token === 'dummyToken') {
             $paymentId = $fcHelper->getPaymentId($this->_code);
@@ -250,13 +250,13 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
                 $paymentProcessor->setPaymentId($paymentId);
             }
         }
-        
+
         $success = $paymentProcessor->processPayment(!$this->_preauthFlag);
 
         $this->_existingClientHandling($clientId);
-        
+
         if ($success) {
-            
+
             if ($this->_preauthFlag) {
                 $payment->setAdditionalInformation('paymillPreauthId', $paymentProcessor->getPreauthId());
             } else {
@@ -264,14 +264,14 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
             }
 
             $payment->setAdditionalInformation(
-                'paymillPrenotificationDate', 
+                'paymillPrenotificationDate',
                 $this->_getPrenotificationDate($payment->getOrder())
             );
-            
+
             //Allways update the client
             $clientId = $paymentProcessor->getClientId();
             $fcHelper->saveData($this->_code, $clientId);
-            
+
             //Save payment data for FastCheckout (if enabled)
             if ($fcHelper->isFastCheckoutEnabled()) { //Fast checkout enabled
                 $paymentId = $paymentProcessor->getPaymentId();
@@ -280,12 +280,12 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
 
             return true;
         }
-        
+
         $this->_errorCode = $paymentProcessor->getErrorCode();
 
         return false;
     }
-    
+
     /**
      * Calculates Date with the setted Prenotification Days and formats it
      * @param Mage_Sales_Model_Order $order
@@ -296,17 +296,17 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         $dateTime = new DateTime($order->getCreatedAt());
         $dateTime->modify('+' . (int) Mage::helper('paymill/optionHelper')->getPrenotificationDays() . ' day');
         $date = Mage::app()->getLocale()->storeDate(
-            $order->getStore(), 
+            $order->getStore(),
             $dateTime->getTimestamp(),
             true
         );
-        
+
         return Mage::helper('core')->formatDate($date, 'short', false);
     }
-    
+
     /**
      * Handle paymill client update if exist
-     * 
+     *
      * @param string $clientId
      */
     private function _existingClientHandling($clientId)
@@ -316,9 +316,9 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
                 trim(Mage::helper('paymill/optionHelper')->getPrivateKey()),
                 Mage::helper('paymill')->getApiUrl()
             );
-     
+
             $quote = Mage::getSingleton('checkout/session')->getQuote();
-            
+
             $client = $clients->getOne($clientId);
             if (Mage::helper("paymill/customerHelper")->getCustomerEmail($quote) !== $client['email']) {
                 $clients->update(
@@ -330,7 +330,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
             }
         }
     }
-    
+
     /**
      * Return paymill short code
      * @return string
@@ -341,7 +341,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
             'paymill_creditcard'  => 'cc',
             'paymill_directdebit' => 'elv'
         );
-        
+
         return $methods[$this->_code];
     }
 
@@ -359,7 +359,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
 
     /**
      * Set invoice transaction id
-     * 
+     *
      * @param Mage_Sales_Model_Order_Invoice $invoice
      * @param type $payment
      */

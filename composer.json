@@ -3,11 +3,11 @@
     "type": "magento-module",
     "license": "Open-Software-License",
     "homepage": "",
-    "description": "Paymill is an easy way to accept credit card payments. For more details and registration visit paymill.de.",
+    "description": "Paymill is an easy way to accept credit card and direct debit payments. For more details visit paymill.de.",
     "authors": [
     {
-        "name": "PayIntelligent",
-        "email": "community@paymill.de"
+        "name": "IMB",
+        "email": "magento@imb.al"
     }
 ],
     "suggest": {
