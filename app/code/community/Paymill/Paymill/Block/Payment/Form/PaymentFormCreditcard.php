@@ -90,7 +90,8 @@ class Paymill_Paymill_Block_Payment_Form_PaymentFormCreditcard extends Paymill_P
         return $data;
     }
 
-    private function setPaymillCcLogos() {
+    private function setPaymillCcLogos() 
+    {
 
         $cards = explode(',', Mage::getStoreConfig('payment/paymill_creditcard/specificcreditcard'));
         $this->creditCardLogosDisplay = '';
@@ -103,18 +104,20 @@ class Paymill_Paymill_Block_Payment_Form_PaymentFormCreditcard extends Paymill_P
                     $card
                 );
                 $this->creditCardLogosBrand .= sprintf(
-                    'paymillCcBrands.push("%s");',
+                     "\n" . 'paymillCcBrands.push("%s");',
                     $card
                 );
             }
         }
     }
 
-    public function getCreditCardLogosBrand() {
+    public function getCreditCardLogosBrand() 
+    {
         return $this->creditCardLogosBrand;
     }
 
-    public function getCreditCardLogosDisplay() {
+    public function getCreditCardLogosDisplay() 
+    {
         return $this->creditCardLogosDisplay;
     }
 }

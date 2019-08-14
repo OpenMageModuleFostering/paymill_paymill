@@ -51,17 +51,17 @@ class Paymill_Paymill_Helper_RefundHelper extends Mage_Core_Helper_Abstract
 
     /**
      * Creates a refund from the ordernumber passed as an argument
-     * @param Mage_Sales_Model_Order $order
+     * @param Mage_Sales_Model_Order_Refund $creditmemo
      * @return boolean Indicator of success
      */
-    public function createRefund($order, $amount)
+    public function createRefund($creditmemo, $payment)
     {
         //Gather Data
         try {
-            $privateKey = Mage::helper('paymill/optionHelper')->getPrivateKey();
-            $apiUrl = Mage::helper('paymill')->getApiUrl();
-            $refundsObject = new Services_Paymill_Refunds($privateKey, $apiUrl);
-            $transactionId = Mage::helper('paymill/transactionHelper')->getTransactionId($order);
+            $refundsObject = new Services_Paymill_Refunds(
+                Mage::helper('paymill/optionHelper')->getPrivateKey(), 
+                Mage::helper('paymill')->getApiUrl()
+            );
         } catch (Exception $ex) {
             Mage::helper('paymill/loggingHelper')->log("No Refund created due to illegal parameters.", $ex->getMessage());
             return false;
@@ -69,16 +69,20 @@ class Paymill_Paymill_Helper_RefundHelper extends Mage_Core_Helper_Abstract
 
         //Create Refund
         $params = array(
-            'transactionId' => $transactionId,
+            'transactionId' => $payment->getAdditionalInformation('paymillTransactionId'),
             'source' => Mage::helper('paymill')->getSourceString(),
-            'params' => array('amount' => $amount)
+            'params' => array('amount' => (int) Mage::helper("paymill/paymentHelper")->getAmount($creditmemo))
         );
+        
+        Mage::helper('paymill/loggingHelper')->log("Try to refund.", var_export($params, true));
+        
         try {
             $refund = $refundsObject->create($params);
         } catch (Exception $ex) {
             Mage::helper('paymill/loggingHelper')->log("No Refund created.", $ex->getMessage(), var_export($params, true));
             return false;
         }
+        
         //Validate Refund and return feedback
         return $this->validateRefund($refund);
     }

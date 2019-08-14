@@ -96,7 +96,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      * 
      * @var boolean
      */
-    protected $_preAuthFlag;
+    protected $_preauthFlag;
     
     /**
      * Can use for internal payments
@@ -205,10 +205,10 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
 
         if (Mage::helper('paymill/optionHelper')->isPreAuthorizing() && $this->_code === "paymill_creditcard") {
             Mage::helper('paymill/loggingHelper')->log("Starting payment process as preAuth");
-            $this->_preAuthFlag = true;
+            $this->_preauthFlag = true;
         } else {
             Mage::helper('paymill/loggingHelper')->log("Starting payment process as debit");
-            $this->_preAuthFlag = false;
+            $this->_preauthFlag = false;
             
         }
         
@@ -225,7 +225,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
     }
 
     /**
-     * Deals with payment processing when debit mode is active
+     * Processing the payment or preauth
      * @return booelan Indicator of success
      */
     public function payment(Varien_Object $payment, $amount)
@@ -251,21 +251,22 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
             }
         }
         
-        $success = $paymentProcessor->processPayment(!$this->_preAuthFlag);
+        $success = $paymentProcessor->processPayment(!$this->_preauthFlag);
 
         $this->_existingClientHandling($clientId);
         
         if ($success) {
-            //Save Transaction Data
-            $transactionHelper = Mage::helper("paymill/transactionHelper");
             
-            $id = $paymentProcessor->getTransactionId();
-            if ($this->_preAuthFlag) {
-                $id = $paymentProcessor->getPreauthId();
+            if ($this->_preauthFlag) {
+                $payment->setAdditionalInformation('paymillPreauthId', $paymentProcessor->getPreauthId());
+            } else {
+                $payment->setAdditionalInformation('paymillTransactionId', $paymentProcessor->getTransactionId());
             }
-            
-            $transactionModel = $transactionHelper->createTransactionModel($id, $this->_preAuthFlag);
-            $transactionHelper->setAdditionalInformation($payment, $transactionModel);
+
+            $payment->setAdditionalInformation(
+                'paymillPrenotificationDate', 
+                $this->_getPrenotificationDate($payment->getOrder())
+            );
             
             //Allways update the client
             $clientId = $paymentProcessor->getClientId();
@@ -283,6 +284,24 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         $this->_errorCode = $paymentProcessor->getErrorCode();
 
         return false;
+    }
+    
+    /**
+     * Calculates Date with the setted Prenotification Days and formats it
+     * @param Mage_Sales_Model_Order $order
+     * @return string
+     */
+    private function _getPrenotificationDate($order)
+    {
+        $dateTime = new DateTime($order->getCreatedAt());
+        $dateTime->modify('+' . Mage::helper('paymill/optionHelper')->getPrenotificationDays() . ' day');
+        $date = Mage::app()->getLocale()->storeDate(
+            $order->getStore(), 
+            Varien_Date::toTimestamp($dateTime->format('Y-m-d H:i:s')),
+            true
+        );
+        
+        return Mage::helper('core')->formatDate($date, 'short', false);
     }
     
     /**
@@ -326,28 +345,18 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         return $methods[$this->_code];
     }
 
-    /**
-     * Handle online refunds and trigger the refund at paymill side
-     * 
-     * @param Varien_Object $payment
-     * @param float $amount
-     * @return Paymill_Paymill_Model_Method_MethodModelAbstract
-     */
-    public function refund(Varien_Object $payment, $amount)
+    public function processCreditmemo($creditmemo, $payment)
     {
-        parent::refund($payment, $amount);
+        parent::processCreditmemo($creditmemo, $payment);
         $order = $payment->getOrder();
         if ($order->getPayment()->getMethod() === 'paymill_creditcard' || $order->getPayment()->getMethod() === 'paymill_directdebit') {
-            $amount = (int) ((string) ($amount * 100));
-            Mage::helper('paymill/loggingHelper')->log("Trying to Refund.", var_export($order->getIncrementId(), true), $amount);
-            
-            if (!Mage::helper('paymill/refundHelper')->createRefund($order, $amount)) {
+            if (!Mage::helper('paymill/refundHelper')->createRefund($creditmemo, $payment)) {
                 Mage::throwException('Refund failed.');
             }
         }
-        return $this;
     }
-    
+
+
     /**
      * Set invoice transaction id
      * 
@@ -357,6 +366,6 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
     public function processInvoice($invoice, $payment)
     {
         parent::processInvoice($invoice, $payment);
-        $invoice->setTransactionId(Mage::helper('paymill/transactionHelper')->getTransactionId($payment->getOrder()));
+        $invoice->setTransactionId($payment->getAdditionalInformation('paymillTransactionId'));
     }
 }

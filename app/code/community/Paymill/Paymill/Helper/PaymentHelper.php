@@ -94,24 +94,38 @@ class Paymill_Paymill_Helper_PaymentHelper extends Mage_Core_Helper_Abstract
      */
     public function getAmount($object = null)
     {
-        if ($object == null) {
+        if (is_null($object)) {
             $object = Mage::getSingleton('checkout/session')->getQuote();
         }
-        $decimalTotal = $object->getBaseGrandTotal();
-        $amountTotal = $decimalTotal * 100;
-        return round($amountTotal);
+        
+        $amount = $object->getBaseGrandTotal();
+        
+        if (!Mage::helper('paymill/optionHelper')->isBaseCurrency()) {
+            $amount = $object->getGrandTotal();
+        }
+        
+        return round($amount * 100);
     }
 
     /**
      * Returns the currency compliant to ISO 4217 (3 char code)
      * @return string 3 Character long currency code
      *
-     * @param Mage_Sales_Model_Quote $quote
+     * @param Mage_Sales_Model_Quote|Mage_Sales_Model_Order|Mage_Sales_Model_Order_Invoice|Mage_Sales_Model_Order_Creditmemo $object
      * @return string
      */
-    public function getCurrency($quote)
+    public function getCurrency($object)
     {
-        return $quote->getBaseCurrencyCode();
+        $currency = $object->getBaseCurrencyCode();
+        if (!Mage::helper('paymill/optionHelper')->isBaseCurrency()) {
+            if ($object instanceof Mage_Sales_Model_Quote) {
+                $currency = $object->getQuoteCurrencyCode();
+            } else {
+                $currency = $object->getOrderCurrencyCode();
+            }
+        }
+        
+        return $currency;
     }
 
     /**
@@ -122,11 +136,7 @@ class Paymill_Paymill_Helper_PaymentHelper extends Mage_Core_Helper_Abstract
      */
     public function getDescription($object)
     {
-        $orderId = $this->getOrderId($object);
-        $customerEmail = Mage::helper("paymill/customerHelper")->getCustomerEmail($object);
-        $description = $orderId . ", " . $customerEmail;
-
-        return $description;
+        return $this->getOrderId($object) . ", " . Mage::helper("paymill/customerHelper")->getCustomerEmail($object);
     }
 
     /**
@@ -136,6 +146,8 @@ class Paymill_Paymill_Helper_PaymentHelper extends Mage_Core_Helper_Abstract
      */
     public function getPaymentType($code)
     {
+        $type = null;
+        
         //Creditcard
         if ($code === "paymill_creditcard") {
             $type = "cc";
@@ -177,10 +189,7 @@ class Paymill_Paymill_Helper_PaymentHelper extends Mage_Core_Helper_Abstract
      */
     public function createPaymentProcessor($paymentCode, $token)
     {
-        $privateKey = Mage::helper('paymill/optionHelper')->getPrivateKey();
-        $apiUrl = Mage::helper('paymill')->getApiUrl();
         $quote = Mage::getSingleton('checkout/session')->getQuote();
-        $libBase = null;
 
         $params = array();
         $params['token'] = $token;
@@ -191,7 +200,14 @@ class Paymill_Paymill_Helper_PaymentHelper extends Mage_Core_Helper_Abstract
         $params['email'] = Mage::helper("paymill/customerHelper")->getCustomerEmail($quote);
         $params['description'] = substr($this->getDescription($quote), 0, 128);
         
-        $paymentProcessor = new Services_Paymill_PaymentProcessor($privateKey, $apiUrl, $libBase, $params, Mage::helper('paymill/loggingHelper'));
+        $paymentProcessor = new Services_Paymill_PaymentProcessor(
+            Mage::helper('paymill/optionHelper')->getPrivateKey(), 
+            Mage::helper('paymill')->getApiUrl(), 
+            null, 
+            $params, 
+            Mage::helper('paymill/loggingHelper')
+        );
+        
         $paymentProcessor->setSource(Mage::helper('paymill')->getSourceString());
         
         return $paymentProcessor;

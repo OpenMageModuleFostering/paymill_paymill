@@ -40,34 +40,28 @@ class Paymill_Paymill_Model_Method_MethodModelCreditcard extends Paymill_Paymill
      * @var string
      */
     protected $_infoBlockType = 'paymill/payment_info_paymentFormCreditcard';
-
-    /**
-     * Gets called when a capture gets triggered (default on invoice generation)
-     * 
-     * @throws Exception
-     */
-    public function capture(Varien_Object $payment, $amount)
+    
+    public function processInvoice($invoice, $payment)
     {
-        parent::capture($payment, $amount);
-        //Initalizing variables and helpers
-        $transactionHelper = Mage::helper("paymill/transactionHelper");
-        $order = $payment->getOrder();
-
-        if ($transactionHelper->isPreAuthenticated($order)) {
-            //Capture preAuth
-            $preAuthorization = $transactionHelper->getTransactionId($order);
-            $privateKey = Mage::helper('paymill/optionHelper')->getPrivateKey();
-            $apiUrl = Mage::helper('paymill')->getApiUrl();
-            $libBase = null;
+        $data = $payment->getAdditionalInformation();
+        
+        if (array_key_exists('paymillPreauthId', $data) && !empty($data['paymillPreauthId'])) {
 
             $params = array();
-            $params['amount'] = (int) (string) ($amount * 100);
-            $params['currency'] = $order->getBaseCurrencyCode();
-            $params['description'] = Mage::helper('paymill/paymentHelper')->getDescription($order);
+            $params['amount'] = (int) Mage::helper("paymill/paymentHelper")->getAmount($invoice);
+            $params['currency'] = Mage::helper("paymill/paymentHelper")->getCurrency($invoice);
+            $params['description'] = Mage::helper('paymill/paymentHelper')->getDescription($payment->getOrder());
             $params['source'] = Mage::helper('paymill')->getSourceString();
 
-            $paymentProcessor = new Services_Paymill_PaymentProcessor($privateKey, $apiUrl, $libBase, $params, Mage::helper('paymill/loggingHelper'));
-            $paymentProcessor->setPreauthId($preAuthorization);
+            $paymentProcessor = new Services_Paymill_PaymentProcessor(
+                Mage::helper('paymill/optionHelper')->getPrivateKey(), 
+                Mage::helper('paymill')->getApiUrl(), 
+                null, 
+                $params, 
+                Mage::helper('paymill/loggingHelper')
+            );
+            
+            $paymentProcessor->setPreauthId($data['paymillPreauthId']);
             
             if (!$paymentProcessor->capture()) {
                 Mage::throwException(Mage::helper("paymill/paymentHelper")->getErrorMessage($paymentProcessor->getErrorCode()));
@@ -75,11 +69,10 @@ class Paymill_Paymill_Model_Method_MethodModelCreditcard extends Paymill_Paymill
 
             Mage::helper('paymill/loggingHelper')->log("Capture created", var_export($paymentProcessor->getLastResponse(), true));
 
-            //Save Transaction Data
-            $transactionId = $paymentProcessor->getTransactionId();
-            $transactionModel = $transactionHelper->createTransactionModel($transactionId, true);
-            $transactionHelper->setAdditionalInformation($payment, $transactionModel);
+            $payment->setAdditionalInformation('paymillTransactionId', $paymentProcessor->getTransactionId());
         }
+        
+        parent::processInvoice($invoice, $payment);
     }
 
 }
