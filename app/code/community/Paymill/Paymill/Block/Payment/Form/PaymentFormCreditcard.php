@@ -1,4 +1,5 @@
-<?php 
+<?php
+
 /**
  * Magento
  * 
@@ -19,6 +20,7 @@
  */
 class Paymill_Paymill_Block_Payment_Form_PaymentFormCreditcard extends Mage_Payment_Block_Form
 {
+
     /**
      * Construct
      */
@@ -26,5 +28,32 @@ class Paymill_Paymill_Block_Payment_Form_PaymentFormCreditcard extends Mage_Paym
     {
         parent::_construct();
         $this->setTemplate('paymill/payment/form/creditcard.phtml');
-     }
+    }
+
+    /**
+     * Retrieve credit card expire months for Paymill
+     *
+     * @return array
+     */
+    public function getPaymillCcMonths()
+    {
+        $months[0] = $this->__('Month');
+        $months = array_merge($months, Mage::getSingleton('payment/config')->getMonths());
+
+        return $months;
+    }
+
+    /**
+     * Retrieve credit card expire years for Paymill
+     *
+     * @return array
+     */
+    public function getPaymillCcYears()
+    {
+        $years = Mage::getSingleton('payment/config')->getYears();
+        $years = array(0 => $this->__('Year')) + $years;
+
+        return $years;
+    }
+
 }
