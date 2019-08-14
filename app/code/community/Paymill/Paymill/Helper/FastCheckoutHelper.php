@@ -77,12 +77,18 @@ class Paymill_Paymill_Helper_FastCheckoutHelper extends Mage_Core_Helper_Abstrac
     
     public function getPaymentData($code)
     {
-        $privateKey = Mage::helper('paymill/optionHelper')->getPrivateKey();
-        $apiUrl = Mage::helper('paymill')->getApiUrl();
         $payment = null;
         if ($this->hasData($code)) {
-            $payments = new Services_Paymill_Payments($privateKey, $apiUrl);
+            $payments = new Services_Paymill_Payments(
+                Mage::helper('paymill/optionHelper')->getPrivateKey(), 
+                Mage::helper('paymill')->getApiUrl()
+            );
+            
             $payment = $payments->getOne($this->getPaymentId($code));
+            
+            if (!array_key_exists('last4', $payment) && !array_key_exists('code', $payment)) {
+                $payment = null;
+            }
         }
         
         return $payment;

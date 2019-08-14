@@ -92,6 +92,8 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
     protected $_code = 'paymill_abstract';
     
     protected $_errorCode;
+    
+    protected $_preAuthFlag;
 
     /**
      * Check if currency is avaible for this payment
@@ -155,7 +157,13 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      */
     public function assignData($data)
     {
-        $post = $data->getData();
+        parent::assignData($data);
+        if (is_array($data)) {
+            $post = $data;
+        } else {
+            $post = $data->getData();
+        }
+        
         if (array_key_exists('paymill-payment-token-' . $this->_getShortCode(), $post) 
                 && !empty($post['paymill-payment-token-' . $this->_getShortCode()])) {
             //Save Data into session
@@ -164,14 +172,11 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         } else {
             if (Mage::helper('paymill/fastCheckoutHelper')->hasData($this->_code)) {
                 Mage::getSingleton('core/session')->setToken('dummyToken');
-            } else {
-                Mage::helper('paymill/loggingHelper')->log("No token found.");
-                Mage::throwException("There was an error processing your payment.");
             }
         }
 
         //Finish as usual
-        return parent::assignData($data);
+        return $this;
     }
 
     /**
@@ -182,14 +187,22 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      */
     public function authorize(Varien_Object $payment, $amount)
     {
-        $success = false;
+        $token = Mage::getSingleton('core/session')->getToken();
+        if (empty($token)) {
+            Mage::helper('paymill/loggingHelper')->log("No token found.");
+            Mage::throwException("There was an error processing your payment.");
+        }
+
         if (Mage::helper('paymill/optionHelper')->isPreAuthorizing() && $this->_code === "paymill_creditcard") {
             Mage::helper('paymill/loggingHelper')->log("Starting payment process as preAuth");
-            $success = $this->preAuth($payment, $amount);
+            $this->_preAuthFlag = true;
         } else {
             Mage::helper('paymill/loggingHelper')->log("Starting payment process as debit");
-            $success = $this->debit($payment, $amount);
+            $this->_preAuthFlag = false;
+            
         }
+        
+        $success = $this->payment($payment, $amount);
 
         if (!$success) {
             Mage::helper('paymill/loggingHelper')->log(Mage::helper("paymill/paymentHelper")->getErrorMessage($this->_errorCode));
@@ -205,7 +218,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      * Deals with payment processing when debit mode is active
      * @return booelan Indicator of success
      */
-    public function debit(Varien_Object $payment, $amount)
+    public function payment(Varien_Object $payment, $amount)
     {
         //Gathering data from session
         $token = Mage::getSingleton('core/session')->getToken();
@@ -216,24 +229,30 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
         
         //Always load client if email doesn't change
         $clientId = $fcHelper->getClientId();
-        if (isset($clientId)) {
+        if (isset($clientId) && !is_null(Mage::helper("paymill/customerHelper")->getClientData())) {
             $paymentProcessor->setClientId($clientId);
         }
         
         //Loading Fast Checkout Data (if enabled and given)
         if ($fcHelper->hasData($this->_code) && $token === 'dummyToken') {
             $paymentId = $fcHelper->getPaymentId($this->_code);
-            if (isset($paymentId)) {
+            if (isset($paymentId) && !is_null($fcHelper->getPaymentData($this->_code))) {
                 $paymentProcessor->setPaymentId($paymentId);
             }
         }
         
-        $success = $paymentProcessor->processPayment();
+        $success = $paymentProcessor->processPayment(!$this->_preAuthFlag);
 
         If ($success) {
             //Save Transaction Data
             $transactionHelper = Mage::helper("paymill/transactionHelper");
-            $transactionModel = $transactionHelper->createTransactionModel($paymentProcessor->getTransactionId(), false);
+            
+            $id = $paymentProcessor->getTransactionId();
+            if ($this->_preAuthFlag) {
+                $id = $paymentProcessor->getPreauthId();
+            }
+            
+            $transactionModel = $transactionHelper->createTransactionModel($id, $this->_preAuthFlag);
             $transactionHelper->setAdditionalInformation($payment, $transactionModel);
             
             //Allways update the client
