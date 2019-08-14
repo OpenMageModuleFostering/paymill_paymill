@@ -46,8 +46,19 @@ class Paymill_Paymill_HookController extends Mage_Core_Controller_Front_Action
     {
         $order = $this->getOrder($data);
         
-        if ((int) Mage::helper('paymill/paymentHelper')->getAmount($order) === (int) $data['amount']) {
-            Mage::helper('paymill/paymentHelper')->invoice($order, $data['id']);
+        if (((int) Mage::helper('paymill/paymentHelper')->getAmount($order) === (int) $data['amount']) 
+            && Mage::getStoreConfig(
+                'payment/' . $order->getPayment()->getMethodInstance()->getCode() . '/hook_create_invoice_active', 
+                Mage::app()->getStore()->getStoreId()
+        )) {
+            Mage::helper('paymill/paymentHelper')->invoice(
+                $order, 
+                $data['id'],
+                Mage::getStoreConfig(
+                    'payment/' . $order->getPayment()->getMethodInstance()->getCode() . '/send_hook_invoice_mail', 
+                    Mage::app()->getStore()->getStoreId()
+                )
+            );
         }
         
         $order->addStatusHistoryComment(
@@ -108,16 +119,16 @@ class Paymill_Paymill_HookController extends Mage_Core_Controller_Front_Action
     {
         $description = '';
         
-        if (array_key_exists('description', $data)) {
-            $description = $data['description'];
+        if (empty($description) && array_key_exists('preauthorization', $data)) {
+            $description = $data['preauthorization']['description'];
         }
         
         if (empty($description) && array_key_exists('transaction', $data)) {
             $description = $data['transaction']['description'];
         }
         
-        if (empty($description) && array_key_exists('preauthorization', $data)) {
-            $description = $data['preauthorization']['description'];
+        if (empty($description) && array_key_exists('description', $data)) {
+            $description = $data['description'];
         }
                 
         return Mage::getModel('sales/order')->loadByIncrementId(substr($description, 0, 9));
