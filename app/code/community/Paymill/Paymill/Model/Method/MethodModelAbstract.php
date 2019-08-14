@@ -117,6 +117,7 @@ abstract class Paymill_Paymill_Model_Method_MethodModelAbstract extends Mage_Pay
      */
     public function isAvailable($quote = null)
     {
+	Mage::log('Token: ' . Mage::getSingleton('core/session')->getToken(), null, 'paymill_test');
         $keysAreSet = Mage::helper("paymill")->isPublicKeySet() && Mage::helper("paymill")->isPrivateKeySet();
         return parent::isAvailable($quote) && $keysAreSet;
     }

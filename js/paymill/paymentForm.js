@@ -72,17 +72,30 @@ function paymillShowCardIcon()
 function paymillResponseHandler(error, result)
 {
 	var paymillValidator = new Validation(pmQuery("input[name='payment[method]']:checked").closest("form").attr("id"));
-	paymillValidator.validate();
 	if (error) {
 		// Appending error
-		PAYMILL_ERROR_STRING += error.apierror + "\n";
+		var nv = {};
+		
+		nv['paymill-validate-' + getPaymillCode() + '-token'] = new Validator(
+			'paymill-validate-' + getPaymillCode() + '-token',
+			getValueIfExist('.paymill-payment-error-' + getPaymillCode() + '-token') + error.message,
+			function(v) {
+				return v !== '';
+			},
+			''
+		);
+
+		Object.extend(Validation.methods, nv);
 		debug(error.apierror);
+		debug(error.message);
 		debug("Paymill Response Handler triggered: Error.");
 	} else {
 		// Appending Token to form
 		debug("Saving Token in Form: " + result.token);
 		pmQuery('.paymill-payment-token-' + getPaymillCode()).val(result.token);
 	}
+	
+	paymillValidator.validate();
 }
 
 function getValueIfExist(selector)
