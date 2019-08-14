@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/Paymill_Paymill",
+    "type": "magento-module",
+    "license": "Open-Software-License",
+    "homepage": "",
+    "description": "Paymill is an easy way to accept credit card payments. For more details and registration visit paymill.de.",
+    "authors": [
+    {
+        "name": "PayIntelligent",
+        "email": "community@paymill.de"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
