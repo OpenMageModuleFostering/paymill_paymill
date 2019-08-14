@@ -56,7 +56,6 @@ class Services_Paymill_PaymentProcessor
         $this->setPrivateKey($privateKey);
         $this->setApiUrl($apiUrl);
         $this->setLibBase($libBase);
-        $this->_preAuthAmount = isset($params['preauthamount']) ? $params['preauthamount'] : 0;
         $this->_token = $params['token'];
         $this->_amount = $params['amount'];
         $this->_currency = $params['currency'];
@@ -108,6 +107,7 @@ class Services_Paymill_PaymentProcessor
                         'client' => $this->_clientId
                     )
             );
+
             $this->_validateResult($payment, 'Payment');
 
             $this->_paymentId = $payment['id'];
@@ -123,15 +123,15 @@ class Services_Paymill_PaymentProcessor
      */
     private function _createTransaction()
     {
-        $transaction = $this->_transactionsObject->create(
-                array(
-                    'amount' => $this->_amount,
-                    'currency' => $this->_currency,
-                    'description' => $this->_description,
-                    'preauthorization' => $this->_preauthId,
-                    'source' => $this->_source
-                )
+        $parameter = array(
+            'amount' => $this->_amount,
+            'currency' => $this->_currency,
+            'description' => $this->_description,
+            'preauthorization' => $this->_preauthId,
+            'source' => $this->_source
         );
+        $this->_preauthId != null ? $parameter['preauthorization'] = $this->_preauthId : $parameter['payment'] = $this->_paymentId;
+        $transaction = $this->_transactionsObject->create($parameter);
         $this->_validateResult($transaction, 'Transaction');
 
         $this->_transactionId = $transaction['id'];
@@ -196,7 +196,7 @@ class Services_Paymill_PaymentProcessor
      */
     private function _validateParameter()
     {
-        if($this->_preAuthAmount == null){
+        if ($this->_preAuthAmount == null) {
             $this->_preAuthAmount = $this->_amount;
         }
 
@@ -292,6 +292,15 @@ class Services_Paymill_PaymentProcessor
         }
     }
 
+    private function _processPreAuthCapture($captureNow)
+    {
+        $this->_createPreauthorization();
+        if ($captureNow) {
+            $this->_createTransaction();
+        }
+        return true;
+    }
+
     /**
      * Executes the Payment Process
      *
@@ -304,13 +313,24 @@ class Services_Paymill_PaymentProcessor
             return false;
         }
 
+        $this->_log('Process payment with following data', print_r($this->toArray(), true));
+
         try {
+
             $this->_createClient();
+            $this->_log('Client API Response', print_r($this->_clientsObject->getResponse(), true));
             $this->_createPayment();
-            $this->_createPreauthorization();
-            if($captureNow){
+            $this->_log('Payment API Response', print_r($this->_paymentsObject->getResponse(), true));
+
+            //creates a transaction if there is no difference between the amount
+            if ($this->_preAuthAmount === $this->_amount && $captureNow) {
                 $this->_createTransaction();
+                $this->_log('Transaction API Response', print_r($this->getLastResponse(), true));
+            } else {
+                $this->_processPreAuthCapture($captureNow);
+                $this->_log('Pre-Auth API Response', print_r($this->getLastResponse(), true));
             }
+
             return true;
         } catch (Exception $ex) {
             // paymill wrapper threw an exception
@@ -319,15 +339,16 @@ class Services_Paymill_PaymentProcessor
         }
     }
 
-    final public function capture(){
+    final public function capture()
+    {
         $this->_initiatePhpWrapperClasses();
-        if(!isset($this->_amount) || !isset($this->_currency) || !isset($this->_preauthId)){
+        if (!isset($this->_amount) || !isset($this->_currency) || !isset($this->_preauthId)) {
             return false;
         }
         return $this->_createTransaction();
     }
 
-        /**
+    /**
      * Returns the objects data
      *
      * @return array
@@ -338,7 +359,6 @@ class Services_Paymill_PaymentProcessor
             'apiurl' => $this->_apiUrl,
             'libbase' => $this->_libBase,
             'privatekey' => $this->_privateKey,
-            'logger' => $this->_logger,
             'token' => $this->_token,
             'amount' => $this->_amount,
             'preauthamount' => $this->_preAuthAmount,
