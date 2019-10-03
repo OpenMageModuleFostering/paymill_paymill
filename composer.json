@@ -1,16 +1,19 @@
 {
-    "name": "OpenMageModuleFostering/Paymill_Paymill",
+    "name": "OpenMageModuleFostering\/Paymill_Paymill",
     "type": "magento-module",
     "license": "Open-Software-License",
     "homepage": "",
     "description": "Paymill is an easy way to accept credit card and direct debit payments. For more details visit paymill.de.",
     "authors": [
-    {
-        "name": "IMB",
-        "email": "magento@imb.al"
-    }
-],
+        {
+            "name": "IMB",
+            "email": "magento@imb.al"
+        }
+    ],
     "suggest": {
-        "magento-hackathon/magento-composer-installer": "*"
-    }
+        "magento-hackathon\/magento-composer-installer": "*"
+    },
+    "keywords": [
+        "openmage-module"
+    ]
 }
